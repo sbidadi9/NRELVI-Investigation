@@ -1,0 +1,102 @@
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#            SIMULATION STOP            #
+#.......................................#
+#time.stop_time               =   0.2     # Max (simulated) time to evolve
+time.max_step                =   1100     # Max number of time steps
+time.max_step = 2
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#         TIME STEP COMPUTATION         #
+#.......................................#
+time.fixed_dt         =   0.0192      # Use this constant dt if > 0
+#time.cfl              =   1.0       # CFL factor
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#        ADAPTIVE MESH REFINEMENT       #
+#.......................................#
+amr.n_cell              = 16 16 16    # Grid cells at coarsest AMRlevel
+amr.max_level           = 0           # Max AMR level in hierarchy 
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#              GEOMETRY                 #
+#.......................................#
+geometry.prob_lo        =   0.       0.     0.  # Lo corner coordinates
+geometry.prob_hi        =   200.  200.  200.  # Hi corner coordinates
+geometry.is_periodic    =   0   0   0   # Periodicity x y z (0/1)
+
+#......................................#
+#            BOUNDARY CONDITIONS       #
+#......................................#
+xlo.type = "mass_inflow"
+xlo.density = 1.246 
+xlo.tke = 0.1
+xlo.sdr = 150.0
+xlo.velocity = 7.0 0.0 0.0
+xhi.type = "pressure_outflow"
+ylo.type =   "slip_wall"
+yhi.type =   "slip_wall"
+zlo.type =   "slip_wall"
+zhi.type =   "slip_wall"
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#            INPUT AND OUTPUT           #
+#.......................................#
+#io.KE_int = -1
+#io.line_plot_int = -1
+#io.derived_outputs = q_criterion
+#io.outputs = wall_dist synth_turb_forcing
+io.output_default_variables = 0 
+io.outputs = density velocity_mueff sdr tke mu_turb 
+io.derived_outputs = "components(velocity,0)"
+time.plot_interval            =  500      # Steps between plot files
+#time.checkpoint_interval      =  1000      # Steps between checkpoint files
+#io.restart_file = chk00052
+incflo.initial_iterations = 3
+
+#--------------------------------------#
+#          POST PROCESSING             # 
+#--------------------------------------#
+# Data probe sampling
+incflo.post_processing = sampling_u_7_tke_0p1_sdr_150
+#sampling.type = Sampling
+sampling_u_7_tke_0p1_sdr_150.output_frequency = 100
+sampling_u_7_tke_0p1_sdr_150.labels = line1
+sampling_u_7_tke_0p1_sdr_150.fields = velocity
+sampling_u_7_tke_0p1_sdr_150.output_format = netcdf
+
+# sampling along a line
+sampling_u_7_tke_0p1_sdr_150.line1.type = LineSampler
+sampling_u_7_tke_0p1_sdr_150.line1.num_points = 8
+sampling_u_7_tke_0p1_sdr_150.line1.start = 0.0 100.0 100.0
+sampling_u_7_tke_0p1_sdr_150.line1.end = 100.0 100.0 100.0
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#               PHYSICS                 #
+#.......................................#
+#incflo.gravity        =  0.0  0.0 -9.81  # Gravitational force (3D)
+incflo.density        =  1.246           # Reference density
+incflo.velocity = 7.0 0.0 0.0
+incflo.use_godunov = 1
+incflo.godunov_type = "weno_z"
+#incflo.do_initial_proj = 1
+incflo.verbose =   0
+
+transport.viscosity = 1.769e-5
+
+turbulence.model = KOmegaSSTIDDES
+TKE.source_terms = KwSSTSrc
+SDR.source_terms = SDRSrc
+
+incflo.physics = FreeStream
+FreeStream.velocity_type = ConstValue
+ConstValue.velocity.value = 7.0 0.0 0.0
+FreeStream.tke_type = ConstValue
+ConstValue.tke.value = 0.1
+FreeStream.sdr_type = ConstValue
+ConstValue.sdr.value = 150.0
+FreeStream.fields = wall_dist
+FreeStream.wall_dist_type = ConstValue
+ConstValue.wall_dist.value = 8.0
+
+#KOmegaSST_coeffs.beta2 = 0.09
+##¨¨¨

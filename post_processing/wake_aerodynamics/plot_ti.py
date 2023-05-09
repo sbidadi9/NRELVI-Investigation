@@ -9,35 +9,69 @@ from matplotlib.backends.backend_pdf import PdfPages
 from cycler import cycler
 from mpl_toolkits.mplot3d import Axes3D
 
-mpl.rcParams['lines.linewidth'] = 4
-mpl.rcParams['axes.titlesize'] = 30
-mpl.rcParams['axes.labelsize'] = 30
-mpl.rcParams['xtick.labelsize'] = 18
-mpl.rcParams['ytick.labelsize'] = 18
+mpl.rcParams['lines.linewidth'] = 4 
+mpl.rcParams['axes.titlesize'] = 34
+mpl.rcParams['axes.labelsize'] = 34
+mpl.rcParams['xtick.labelsize'] = 22
+mpl.rcParams['ytick.labelsize'] = 22
 mpl.rcParams['legend.fontsize'] = 15.0
 #mpl.rcParams['figure.figsize'] = (6.328, 6.328)
-mpl.rcParams["figure.figsize"] = [30, 7]
-#plt.style.use('classic')
+mpl.rcParams["figure.figsize"] = [20, 7]
 
 comm = MPI.COMM_WORLD
 rank = comm.rank  # The process ID (integer 0-3 for 4-process run)
 size = comm.size # Total number of procs
 
-u_infty = 7.0
+rho = 1.246
 d = 10.058
-NTS_IDDES = 60000
-NTS_SST = 14400
 
 NPS_IDDES = 7
-NPS_SST = 8
+NPS_SST = 7
 Nyz = 88
 
 k_t = 0.1
 k_bp = 0.025 
-C_thrust = 0.75
 
-sp_sst = nc.Dataset('/projects/hfm/sbidadi/nrel_phase_vi/nrel_phase_vi_output/ti_calculations/u_7/sst/sampling_plane00000.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
-sp_iddes = nc.Dataset('/projects/hfm/sbidadi/nrel_phase_vi/nrel_phase_vi_output/ti_calculations/u_7/iddes/sampling_plane43200.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+xmin = -1.2
+xmax = 1.2
+
+ymin = 0.0
+ymax = 14.0 
+
+crespo_const = 0.73
+
+# SST
+NInit_SST = 36000
+NFinal_SST = 43200
+
+# IDDES
+# u_infty = 7
+#NInit_IDDES = 23022 # 14382
+#NFinal_IDDES = 28782 #73489 #62160
+#sp_sst = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/sst/u_7_sst_fine_mesh_far_wake/post_processing/sampling_plane00000.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+#sp_iddes = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/iddes/u_7_fine_mesh_far_wake/iddes_30r/post_processing/sampling_plane00100.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+
+# u_infty = 12.0
+#NInit_IDDES = 57600
+#NFinal_IDDES = 72100
+#sp_sst = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/sst/u_12_sst_fine_mesh_far_wake/post_processing/sampling_plane00000.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+#sp_iddes = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/iddes/u_12_fine_mesh_far_wake/iddes_30r/post_processing/sampling_plane00100.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+
+# u_infty = 15.0
+#NInit_IDDES = 57600
+#NFinal_IDDES = 72100
+#sp_sst = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/sst/u_15_sst_fine_mesh_far_wake/post_processing/sampling_plane00000.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+#sp_iddes = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/iddes/u_15_fine_mesh_far_wake/iddes_30r/post_processing/sampling_plane00100.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+
+u_infty = 20.0
+NInit_IDDES = 14400
+NFinal_IDDES = 28800
+sp_sst = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/sst/u_20_sst_fine_mesh_far_wake/post_processing/sampling_plane00000.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+sp_iddes = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/iddes/u_20_new/iddes_10r/post_processing/sampling_plane138340.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+
+NTS_IDDES = NFinal_IDDES - NInit_IDDES 
+NTS_SST = NFinal_SST - NInit_SST
+
 
 ###########################################################################################
 #                                   Plane Plots
@@ -52,10 +86,10 @@ def get_mean_velocity(velocity, yz_plane, turb_model):
 
     if (turb_model == 'SST'):
        vel = sp_sst["p_yz"][velocity]
-       tstep_range = np.array_split( range(NTS_SST, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_SST, NFinal_SST, 1), size)[rank]
     elif (turb_model == 'IDDES'):
        vel = sp_iddes["p_yz"][velocity]
-       tstep_range = np.array_split( range(NTS_IDDES, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_IDDES, NFinal_IDDES, 1), size)[rank]
  
     for i in tstep_range: # loop over time steps
         if (turb_model == 'SST'):
@@ -91,10 +125,10 @@ def get_variance(velocity, yz_plane, turb_model):
     vel_mean = get_mean_velocity(velocity, yz_plane, turb_model) * u_infty
 
     if (turb_model == 'SST'):
-       tstep_range = np.array_split( range(NTS_SST, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_SST, NFinal_SST, 1), size)[rank]
        vel = sp_sst["p_yz"][velocity]
     elif (turb_model == 'IDDES'):
-       tstep_range = np.array_split( range(NTS_IDDES, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_IDDES, NFinal_IDDES, 1), size)[rank]
        vel = sp_iddes["p_yz"][velocity]
  
     for i in tstep_range: # loop over time steps
@@ -148,10 +182,10 @@ def get_tke(yz_plane, turb_model):
     g_tke_res_m = tke_res_m
 
     if (turb_model == 'SST'):
-       tstep_range = np.array_split( range(NTS_SST, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_SST, NFinal_SST, 1), size)[rank]
        tke_sgs = sp_sst['p_yz']['tke']
     elif (turb_model == 'IDDES'):
-       tstep_range = np.array_split( range(NTS_IDDES, -1, -1), size)[rank]
+       tstep_range = np.array_split( range(NInit_SST, NFinal_IDDES, 1), size)[rank]
        tke_sgs = sp_iddes['p_yz']['tke']
  
     for i in tstep_range: # loop over time steps
@@ -201,7 +235,8 @@ def plot_ti():
     nrows = 1
     ncols = 4 
 
-    X = [1, 2, 3, 5, 7, 10, 14] 
+    Xtot = [1, 2, 3, 5, 7, 10, 14] 
+    X = [1, 3, 5, 7, 10] 
 
     Y,Z = np.meshgrid(np.linspace(-17.5, 17.5, 88), np.linspace(-17.5, 17.5, 88))
 
@@ -211,129 +246,38 @@ def plot_ti():
     a_in = 0.1
     ti_up = 5
 
-    with PdfPages('ti_z0_iddes.pdf') as pfpgs:
+    with PdfPages('ti_z0_' + str(int(u_infty)) + '.pdf') as pfpgs:
          plt.figure()
-         fig, axs = plt.subplots(1, 4, squeeze=False)
-         for iplane in range(0, 4):
+         fig, axs = plt.subplots(1, 5, sharex=True, sharey=True, squeeze=False)
+         fig.add_subplot(111, frameon=False)
+         for iplane in range(0, 5):
              ax = axs[0, iplane]
              ti_ich_a = np.ones(Nyz)
 
              # Crespo and Hernandez:
-             ti_ich = 100*0.73*pow(a_in, 0.8325)*pow(ti_up, 0.0325)*pow(X[iplane],-0.32)
-             ti_ich_a = ti_ich_a*ti_ich
-
-             # Xie and Archer:
-             # ti_xa = 5.7*pow(C_thrust, 0.5)*pow(ti_up, 0.68)*  
-             
-             # CFD
-             ti_sst = get_turb_intensity(iplane+1, 'SST')
-             ti_iddes = get_turb_intensity(iplane, 'IDDES')
-
-             ti_sst_at_z0 = ti_sst[:,44]
-             ti_iddes_at_z0 = ti_iddes[:,44]
-          
-             sst_plot, = ax.plot(Y[0,:], ti_sst_at_z0, linewidth=2, label = 'SST')
-             iddes_plot, = ax.plot(Y[0,:], ti_iddes_at_z0, linewidth=2, label = 'IDDES')
-             ti_ich_a, = ax.plot(Y[0,:], ti_ich_a, linewidth=2, color='red', label = 'Crespo-Hernandez model')
-             ax.set_title('x/d = {}'.format(X[iplane]))
-             ax.set_xlim([-1.5, 1.5])
-             ax.set_ylim([0.0,15.0])
-             ax.set_xlabel('y/d')
-             ax.set_ylabel('TI (%)')
-         plt.tight_layout()
-         pfpgs.savefig()
-         plt.close(fig)
-
-         i = 0
-         plt.figure() 
-         fig, axs = plt.subplots(1, 3, squeeze=False) 
-         for iplane in range(4,7):
-             ax = axs[0, i]
-             ti_ich_a = np.ones(Nyz)
-
-             # Crespo and Hernandez:
-             ti_ich = 100*0.73*pow(a_in, 0.8325)*pow(ti_up, 0.0325)*pow(X[iplane],-0.32)
+             ti_ich = 100*crespo_const*pow(a_in, 0.83)*pow(ti_up, 0.03)*pow(X[iplane],-0.32)
              ti_ich_a = ti_ich_a*ti_ich
 
              # CFD
-             ti_sst = get_turb_intensity(iplane+1, 'SST')
-             ti_iddes = get_turb_intensity(iplane, 'IDDES')
+             index = Xtot.index(X[iplane])
+             ti_iddes = get_turb_intensity(index, 'IDDES')
+             ti_sst = get_turb_intensity(index, 'SST')
 
-             ti_sst_at_z0 = ti_sst[:,44]
              ti_iddes_at_z0 = ti_iddes[:,44]
+             ti_sst_at_z0 = ti_sst[:,44]
 
-             sst_plot, = ax.plot(Y[0,:], ti_sst_at_z0, linewidth=2, label = 'SST')
-             iddes_plot, = ax.plot(Y[0,:], ti_iddes_at_z0, linewidth=2, label = 'IDDES')
-             ti_ich_a, = ax.plot(Y[0,:], ti_ich_a, linewidth=2, color='red', label = 'Crespo-Hernandez model') 
+             sst_plot, = ax.plot(Y[0,:], ti_sst_at_z0, label = 'SST', color='blue')          
+             iddes_plot, = ax.plot(Y[0,:], ti_iddes_at_z0, label = 'IDDES', color='red')
+             ti_ich_a, = ax.plot(Y[0,:], ti_ich_a, label = 'Crespo-Hernandez model', color='black')
              ax.set_title('x/d = {}'.format(X[iplane]))
-             ax.set_xlim([-1.5, 1.5])
-             ax.set_ylim([0.0,15.0]) 
-#             ax.set_ylim([-1.5,1.5])
-             ax.set_xlabel('y/d')
-             ax.set_ylabel('TI (%)')
-             handles, labels = ax.get_legend_handles_labels()
-             fig.legend(handles, labels, loc = 'lower right') 
-             i = i + 1
+             ax.set_xlim([xmin, xmax])
+             ax.set_ylim([ymin,ymax])
+         plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+         plt.xlabel('y/d')
+         plt.ylabel('TI (%)')
          plt.tight_layout()
          pfpgs.savefig()
          plt.close(fig)
-
-
-    with PdfPages('ti_y0_iddes.pdf') as pfpgs:
-         velocities = ['velocityx']
-         plt.figure()  
-         fig, axs = plt.subplots(1, 4, squeeze=False)
-         for iplane in range(0, 4):
-             ax = axs[0, iplane]
-
-             # CFD
-             ti_sst = get_turb_intensity(iplane+1, 'SST')
-             ti_iddes = get_turb_intensity(iplane, 'IDDES')
-
-             ti_sst_at_y0 = ti_sst[44,:]
-             ti_iddes_at_y0 = ti_iddes[44,:]
-         
-             sst_plot, = ax.plot(Y[0,:], ti_sst_at_y0, linewidth=2, label = 'SST')
-             iddes_plot, = ax.plot(Y[0,:], ti_iddes_at_y0, linewidth=2, label = 'IDDES')
-             ax.set_title('x/d = {}'.format(X[iplane]))
-             ax.set_xlim([-1.5, 1.5])
-             ax.set_ylim([0.0,15.0])
-#             ax.set_ylim([-1.5,1.5])
-             ax.set_xlabel('z/d')
-             ax.set_ylabel('TI (%)')
-         plt.tight_layout()
-         pfpgs.savefig()
-         plt.close(fig)
-
-         i = 0
-         plt.figure() 
-         fig, axs = plt.subplots(1, 3, squeeze=False)  
-         for iplane in range(4,7):
-             ax = axs[0, i]
-
-             # CFD
-             ti_sst = get_turb_intensity(iplane+1, 'SST')
-             ti_iddes = get_turb_intensity(iplane, 'IDDES')
-
-             ti_sst_at_y0 = ti_sst[44,:]
-             ti_iddes_at_y0 = ti_iddes[44,:]
-          
-             sst_plot, = ax.plot(Y[0,:], ti_sst_at_y0, linewidth=2, label = 'SST')
-             iddes_plot, = ax.plot(Y[0,:], ti_iddes_at_y0, linewidth=2, label = 'IDDES')
-             ax.set_title('x/d = {}'.format(X[iplane]))
-             ax.set_xlim([-1.5, 1.5])
-             ax.set_ylim([0.0,15.0]) 
-#             ax.set_ylim([-1.5,1.5])
-             ax.set_xlabel('z/d')
-             ax.set_ylabel('TI (%)')
-             handles, labels = ax.get_legend_handles_labels()
-             fig.legend(handles, labels, loc = 'lower right') 
-
-             i = i + 1
-         plt.tight_layout()
-         pfpgs.savefig()
-         plt.close(fig)
-
 
 if __name__=="__main__":
 

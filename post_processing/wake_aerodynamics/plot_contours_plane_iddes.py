@@ -1,5 +1,6 @@
 import matplotlib as mpl
 import netCDF4 as nc
+import mpi4py
 from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,17 +9,20 @@ from matplotlib.ticker import LinearLocator
 from matplotlib.backends.backend_pdf import PdfPages
 from cycler import cycler
 from mpl_toolkits.mplot3d import Axes3D
+#from mpi4py import MPI
 
 mpl.rcParams['lines.linewidth'] = 2
-
+mpl.rcParams['axes.titlesize'] = 6
+mpl.rcParams['axes.labelsize'] = 6
+mpl.rcParams['xtick.labelsize'] = 6
+mpl.rcParams['ytick.labelsize'] = 6
 plt.style.use('classic')
 
 comm = MPI.COMM_WORLD
 rank = comm.rank  # The process ID (integer 0-3 for 4-process run)
 size = comm.size # Total number of procs
 
-
-u_infty = 7.0
+u_infty = 20.0
 d = 10.058
 NTS = 28800
 NPS = 7
@@ -26,7 +30,7 @@ Nyz = 88
 
 tstep_range = np.array_split( range(NTS), size)[rank]
 
-sp = nc.Dataset('/projects/hfm/sbidadi/nrel_phase_vi/nrel_phase_vi_output/ti_calculations/u_7/iddes/sampling_plane00100.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
+sp = nc.Dataset('/scratch/sbidadi/nrel_vi/147s/iddes/u_20/iddes_30r/post_processing/sampling_plane49060.nc', parallel=True, comm=MPI.COMM_WORLD, info=MPI.Info())
 
 ###########################################################################################
 #                                   Plane Plots
@@ -167,7 +171,6 @@ def plot_velocity_deficit():
          fig, axs = plt.subplots(nrows, ncols, squeeze=False)
          for iplane in range(4):
              ax = axs[0, iplane]
-#             fig = plt.figure()
              uavg = get_mean_velocity('velocityx', iplane)
              uavg_at_z0 = uavg[:,44]
              u_def = 1.0 - uavg_at_z0
@@ -192,7 +195,6 @@ def plot_velocity_deficit():
          fig, axs = plt.subplots(nrows, ncols, squeeze=False)
          for iplane in range(4):
              ax = axs[0, iplane]
-#             fig = plt.figure()
              uavg = get_mean_velocity('velocityx', iplane)
              uavg_at_y0 = uavg[44,:]
              u_def = 1.0 - uavg_at_y0
@@ -210,9 +212,6 @@ def plot_velocity_deficit():
          pfpgs.savefig()
          plt.close(fig)
 
-
-
-
 def plot_contours():
 
     nrows = 3
@@ -224,92 +223,71 @@ def plot_contours():
     Y = Y / d
     Z = Z / d
 
-    with PdfPages('velocity_contour.pdf') as pfpgs:
-         velocities = ['velocityx', 'velocityy', 'velocityz']
-         for iplane in range(7):
-             plt.rcParams["figure.autolayout"] = True
+    with PdfPages('velocity_deficit_contour.pdf') as pfpgs:
+         velocities = ['velocityx']
+         plt.figure()
+         plt.rcParams["figure.figsize"] = [30, 5]
+         fig, axs = plt.subplots(1, 4, squeeze=False)
+         for iplane in range(0, 4):
+             ax = axs[0, iplane]
+             uavg = get_mean_velocity('velocityx', iplane)  
+             u_def = 1.0 - uavg
+             u_def[u_def<0] = 0.0 
+             levels = np.linspace(0.0, 0.2, 6)
+             pcm = ax.contourf(Y, Z, u_def, levels=levels) 
+             ax.set_title('x/d = {}'.format(X[iplane]))
+             ax.set(xlabel='y/d', ylabel='z/d')
+         fig.colorbar(pcm,ax=axs)
+         pfpgs.savefig()
+         plt.close(fig)
 
-             fig, axs = plt.subplots(nrows, ncols, squeeze=False)
-             for col in range(ncols):
-                 for row, velname in enumerate(velocities):
-                     ax = axs[row, col]
-                     uavg = get_mean_velocity(velname, iplane)
-                     pcm = ax.contourf(Y, Z, uavg)
-                     cbar = fig.colorbar(pcm, ax=ax)
-                     tick_font_size = 5
-                     cbar.ax.tick_params(labelsize=tick_font_size)
-                     ax.set_title('Normalized ' + velname + ' - x/d = {}'.format(X[iplane]))
-                     ax.set(xlabel='y/d', ylabel='z/d')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
-
-    with PdfPages('tke_contour.pdf') as pfpgs:
-         for iplane in range(7):
-             tke = get_tke(iplane)
-             fig = plt.figure()
-             cp = plt.contourf(Y, Z, tke)
-             plt.colorbar(cp)
-             plt.title('turbulent kinetic energy - x/d = {}'.format(X[iplane]))
-             plt.xlabel('y/d')
-             plt.ylabel('z/d')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
+         i = 0
+         plt.figure()
+         plt.rcParams["figure.figsize"] = [20, 5]
+         fig, axs = plt.subplots(1, 3, squeeze=False) 
+         for iplane in range(4,7):
+             ax = axs[0, i]
+             uavg = get_mean_velocity('velocityx', iplane)  
+             u_def = 1.0 - uavg
+             u_def[u_def<0] = 0.0
+             levels = np.linspace(-0.01, 0.2, 6)
+             pcm = ax.contourf(Y, Z, u_def, levels=levels) 
+             ax.set_title('x/d = {}'.format(X[iplane]))
+             ax.set(xlabel='y/d', ylabel='z/d')
+             i = i + 1
+         fig.colorbar(pcm,ax=axs)
+         pfpgs.savefig()
+         plt.close(fig)
 
     with PdfPages('turbulent_intensity.pdf') as pfpgs:
-         for iplane in range(7):
-             turb_intensity = get_turb_intensity(iplane)
-             fig = plt.figure()
-             cp = plt.contourf(Y, Z, turb_intensity)
-             plt.colorbar(cp)
-             plt.title('TI(%) - x/d = {}'.format(X[iplane]))
-             plt.xlabel('y/d')
-             plt.ylabel('z/d')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
+         plt.rcParams["figure.figsize"] = [30, 5]
+         fig, axs = plt.subplots(1, 4, squeeze=False)
+         for iplane in range(0, 4):
+             ax = axs[0, iplane]
+             turb_intensity = get_turb_intensity(iplane) 
+             levels = np.linspace(0.0, 12, 20)
+             pcm = ax.contourf(Y, Z, turb_intensity, levels=levels) 
+             ax.set_title('x/d = {}'.format(X[iplane]))
+             ax.set(xlabel='y/d', ylabel='z/d')
+         fig.colorbar(pcm,ax=axs)
+         pfpgs.savefig()
+         plt.close(fig)
 
-    with PdfPages('velocityx_deficit_at_z=0.pdf') as pfpgs:
-         for iplane in range(7):
-             fig = plt.figure()
-             uavg = get_mean_velocity('velocityx', iplane)
-             uavg_at_z0 = uavg[:,44]
-             u_def = 1.0 - uavg_at_z0
-             plt.plot(u_def, Y[0,:])
-             plt.title('velocityx deficit vs. y/d at z=0 on - x/d = {}'.format(X[iplane]))
-             plt.ylabel('y/d')
-             plt.xlabel('$u_{def}$/U')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
-
-    with PdfPages('velocityx_at_z=0.pdf') as pfpgs:
-         for iplane in range(7):
-             fig = plt.figure()
-             uavg = get_mean_velocity('velocityx', iplane)
-             uavg_at_z0 = uavg[:,44]
-             plt.plot(Y[0,:], uavg_at_z0)
-             plt.title('velocityx vs. y/d at z=0 on - x/d = {}'.format(X[iplane]))
-             plt.xlabel('y/d')
-             plt.ylabel('$u_{avg}$/u')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
-
-    with PdfPages('turbulent_intensity_at_z=0.pdf') as pfpgs:
-         for iplane in range(7):
-             fig = plt.figure()
-             turb_intensity = get_turb_intensity(iplane)
-             ti_at_z0 = turb_intensity[:,44]
-             plt.plot(Y[0,:], ti_at_z0)
-             plt.title('TI vs. y/d at z=0 on - x/d = {}'.format(X[iplane]))
-             plt.xlabel('y/d')
-             plt.ylabel('TI(%)')
-             plt.tight_layout()
-             pfpgs.savefig()
-             plt.close(fig)
-
+         i = 0
+         plt.figure()
+         plt.rcParams["figure.figsize"] = [20, 5]
+         fig, axs = plt.subplots(1, 3, squeeze=False) 
+         for iplane in range(4,7):
+             ax = axs[0, i]
+             turb_intensity = get_turb_intensity(iplane) 
+             levels = np.linspace(0.0, 12, 20)
+             pcm = ax.contourf(Y, Z, turb_intensity, levels=levels) 
+             ax.set_title('x/d = {}'.format(X[iplane]))
+             ax.set(xlabel='y/d', ylabel='z/d')
+             i = i + 1
+         fig.colorbar(pcm,ax=axs)
+         pfpgs.savefig()
+         plt.close(fig)
 
 if __name__=="__main__":
 
